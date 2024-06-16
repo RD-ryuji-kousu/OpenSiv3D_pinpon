@@ -1,5 +1,6 @@
 ﻿# include <Siv3D.hpp> // Siv3D v0.6.14
 #if 1
+//オブジェクト初期位置、速度サイズなどの定数
 const double BALL_X = 400.;
 const double BALL_Y = 300.;
 const double BALL_R = 5.;
@@ -26,13 +27,19 @@ private :
 };
 
 Object::~Object(){}
-
+//バーの管理クラス
 class BAR :public Object {
 public:
+	/*
+	* @param[in] bar Vec2でバーのX,Yを初期化する
+	*/
 	BAR(const Vec2 &bar_): bar(bar_) {}//　コンストラクタ Vec2でプレイヤー側のバーを初期化
 	/*バーとの反射
 	* ボールと速度、ラリー数を参照型で引数とする
-	* 反射した場合true,しない場合falseを返す
+	* @param[in,out] ball	ボールの位置情報
+	* @param[in,out] ball_v	ボールの速度
+	* @param[in,out] rally	ラリー回数
+	* @return 反射した場合true,しない場合falseを返す
 	*/
 	virtual bool refrect(Vec2& ball, Vec2& ball_v, int &rally) {
 		Vec2 p = ball + ball_v;		//移動後のボール
@@ -112,7 +119,9 @@ public:
 	virtual void Draw() {		//バーの描画
 		RectF{ Arg::center(bar.x, bar.y), 5, 100 }.draw();
 	}
-	virtual void move(const BALL& ball) {		//キーの上下でバーを動かす
+	/// @brief キーの上下でバーを動かす
+	/// @param[in] ball ボールの位置情報
+	virtual void move(const BALL& ball) {		//
 		if (KeyUp.pressed()) {
 			bar.y -= bar_dy * Scene::DeltaTime();
 			if (bar.y <= 5)bar.y = 5;
@@ -132,6 +141,11 @@ private:
 
 class border :public Object {
 public:
+	/// @brief 外枠との反射
+	/// @param[in,out] ball  ボールの位置情報
+	/// @param[in,out] ball_v	ボールの速度
+	/// @param[in,out] rally	ラリー回数
+	/// @return 反射した場合true,そうでない場合false
 	virtual bool refrect(Vec2& ball, Vec2& ball_v, int& rally) {
 		if (ball_v.y == 0)return false;		//ボールが平行移動している場合falseを返す
 		double ball_vec = ball_v.x / ball_v.y;
@@ -146,7 +160,7 @@ public:
 				return true;
 			}
 		}
-		if (ball.y >= 595 && p.y >= 595) {
+		if (ball.y >= 595 && p.y >= 595) {//下のボーダーライン
 			double ball_line_under = (595.0 - ball.y) * ball_vec + ball.x;
 			if (5.0 <= ball_line_under && ball_line_under <= 795) {
 				ball = { ball_line_under, 595.0 };
@@ -176,12 +190,18 @@ private:
 };
 #endif
 #if 1
+//ボールの管理クラス
 class BALL :public Object{
 private:
 	Vec2 ball, ball_v;
 
 	int score1, score2;
 public:
+	/// @brief コンストラクタ
+	/// @param ball_[in] ボールの位置情報の初期化
+	/// @param ball_v_[in] ボールの速度の初期化
+	/// @param score1_ プレイヤー側の得点を初期化
+	/// @param score2_ cpuの得点を初期化
 	BALL(const Vec2& ball_, const Vec2& ball_v_, int score1_, int score2_):ball(ball_), ball_v(ball_v_),
 	score1(score1_), score2(score2_){}
 	virtual void Draw() {
@@ -191,21 +211,23 @@ public:
 	void calc_ball(BAR& bar, border& line, Bar_Computer& bar2, int& rally);
 
 	virtual void move(const BALL& ball_){}
+
 	virtual bool refrect(Vec2& ball_, Vec2& ball_v_, int& rally) { return false; }
 #if 1
+	//スコアを返す関数
 	int Score1() {
 		return score1;
 	}
 	int Score2() {
 		return score2;
 	}
-
+	//情報のリセット
 	void reset_score() {
 		score1 = 0, score2 = 0;
 		ball = { BALL_X, BALL_Y };
 		ball_v = BALL_V0;
 	}
-
+	//ボールの位置情報を返す
 	const Vec2& get_ball() const{
 		return ball;
 	}
@@ -216,7 +238,11 @@ public:
 class Bar_Computer :public BAR {
 
 public:
+	///バーのコンストラクタ
+	///@param[in] バーの位置情報
 	Bar_Computer(const Vec2& bar_):BAR(bar_){}
+	/// @brief cpuのバーの動き
+	/// @param c_ball[in] ボールの位置情報
 	virtual void move(const BALL& c_ball) {
 		const Vec2 &ball = c_ball.get_ball();
 		double dy = ball.y - bar.y;
@@ -234,6 +260,11 @@ public:
 };
 #endif
 #if 1
+/// @brief ボールを動かす関数
+/// @param bar[in,out] バーの情報
+/// @param line[in,out] ラインの情報
+/// @param bar2[in,out] cpuバーの情報
+/// @param rally[in,out] ラリー回数
 void BALL::calc_ball(BAR& bar, border& line, Bar_Computer& bar2, int& rally) {
 
 	bool colision = false;
@@ -247,6 +278,7 @@ void BALL::calc_ball(BAR& bar, border& line, Bar_Computer& bar2, int& rally) {
 	}
 	if (colision == false)ball += ball_v;
 #endif
+	//得点ラインを超えたら点数を加算、速度とラリー回数を初期化
 	if (ball.x >= 795) {
 		score1++;
 		ball = { BALL_X, BALL_Y };
@@ -305,6 +337,7 @@ void Main()
 			Bar.move(Ball);
 			cpu.move(Ball);
 			Ball.calc_ball(Bar, line, cpu, rally);
+			//どちらかが5点を超えたら終了
 			if (Ball.Score1() == 5) {
 				game_state = U"over";
 			}
@@ -314,16 +347,19 @@ void Main()
 		}
 #endif
 #if 1
+		//ゲームオーバー処理
 		else if (game_state == U"over") {
 			if (Ball.Score1() == 5)title(text1).draw(Arg::center(400, 100));
 			else title(text2).draw(Arg::center(400, 100));
 			font(restart).draw(Arg::center(400, 300));
 			font(quit).draw(Arg::center(400, 400));
+			//リセットして再スタート
 			if (KeyR.down()) {
 				Ball.reset_score();
 				rally = 0;
 				game_state = U"game";
 			}
+			//ゲーム終了
 			else if (KeyQ.down()) {
 				System::Exit();
 			}
